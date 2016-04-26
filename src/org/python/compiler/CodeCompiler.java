@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Stack;
@@ -135,6 +136,10 @@ public class CodeCompiler extends Visitor implements Opcodes, ClassConstants {
     private int bcfLevel = 0;
     private int yield_count = 0;
     private Stack<String> stack = new Stack<String>();
+    
+    HashMap<String, Label> gotoLabels = new HashMap<String, Label>();
+    private static String JYGOTO_GOTO_NAME = "goto";
+    private static String JYGOTO_LABEL_NAME = "label";
 
     public CodeCompiler(Module module, boolean print_results) {
         this.module = module;
@@ -143,6 +148,15 @@ public class CodeCompiler extends Visitor implements Opcodes, ClassConstants {
         continueLabels = new Stack<Label>();
         breakLabels = new Stack<Label>();
         exceptionHandlers = new Stack<ExceptionHandler>();
+    }
+    
+    private Label aquireGotoLabel(String labelName) {
+        if (gotoLabels.containsKey(labelName)) {
+            return gotoLabels.get(labelName);
+        }
+        Label newLabel = new Label();
+        gotoLabels.put(labelName, newLabel);
+        return newLabel;
     }
 
     public void getNone() throws IOException {
@@ -2045,6 +2059,20 @@ public class CodeCompiler extends Visitor implements Opcodes, ClassConstants {
 
     @Override
     public Object visitAttribute(Attribute node) throws Exception {
+        //System.out.println(node.toStringTree());
+        String name = node.getInternalValue().getText();
+        if (name.equals(JYGOTO_GOTO_NAME)) {
+            String labelName = node.getInternalAttr();
+	        //System.out.println("I'm a goto to label: " + labelName);
+            Label label = aquireGotoLabel(labelName);
+            code.goto_(label);
+        }
+        else if (name.equals(JYGOTO_LABEL_NAME)) {
+	        String labelName = node.getInternalAttr();
+            //System.out.println("I'm a label: " + labelName);
+            Label label = aquireGotoLabel(labelName);
+            code.label(label);
+        }
 
         expr_contextType ctx = node.getInternalCtx();
         if (node.getInternalCtx() == expr_contextType.AugStore && augmode == expr_contextType.Store) {
